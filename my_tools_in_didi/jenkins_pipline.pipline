@@ -1,0 +1,79 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Clone / Update Code') {
+            steps {
+                script {
+                    def repoDir = "VDP_" // fixed directory instead of creating new each time
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'gitlab-andyzong',
+                            usernameVariable: 'GIT_USER',
+                            passwordVariable: 'GIT_PASS'
+                        )
+                    ]) {
+                        bat """
+                            :: check if the repository already exists
+                            if not exist "${repoDir}\\.git" (
+                                echo Cloning repository...
+                                git clone https://%GIT_USER%:%GIT_PASS%@git.xxxx.com/VehicleDomainPlatform/d2_vdp.git ${repoDir}
+                            ) else (
+                                echo Updating repository...
+                                cd ${repoDir}
+                                git reset --hard HEAD
+                                git clean -fdx
+                                git pull origin master
+                                cd ..
+                            )
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Copy Build Scripts') {
+            steps {
+                script {
+                    def repoDir = "VDP_" // same directory as above
+                    bat """
+                        :: copy Jenkins-specific scripts to target directory
+                        xcopy /Y "${repoDir}\\z_build_s19\\launch_jenkins.bat" "${repoDir}\\project\\util\\"
+                        xcopy /Y "${repoDir}\\z_build_s19\\launch_cfg_jenkins.bat" "${repoDir}\\project\\util\\"
+
+                        :: verify copy result
+                        echo Checking result:
+                        dir "${repoDir}\\project\\util\\launch_jenkins*"
+                    """
+                }
+            }
+        }
+        stage('GHS Build') {
+            steps {
+                script {
+                    def repoDir = "VDP_"
+                    bat """
+                        cd "${repoDir}\\project\\util"
+                        call launch_jenkins.bat
+                        make -j
+                    """
+                }
+            }
+        }
+        stage('Execute Scripts') {
+            steps {
+                script {
+                    def repoDir = "VDP_"
+                    bat """
+                        cd ${repoDir}\\z_build_s19
+                        call copy_bin_to_here.bat
+                    """
+                    bat """
+                        cd ${repoDir}\\z_build_s19
+                        call zGenS19frommot_D2.bat
+                    """
+                }
+            }
+        }
+    }
+}
