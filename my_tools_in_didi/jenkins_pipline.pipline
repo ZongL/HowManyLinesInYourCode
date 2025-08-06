@@ -2,28 +2,31 @@ pipeline {
     agent any
 
     stages {
+        // stage('Clean Workspace') {
+        //      steps {
+        //          deleteDir()
+        //      }
+        // }
         stage('Clone / Update Code') {
             steps {
                 script {
-                    def repoDir = "VDP_" // fixed directory instead of creating new each time
+                    def repoDir = "yourproject" // fixed directory instead of creating new each time
                     withCredentials([
-                        usernamePassword(
-                            credentialsId: 'gitlab-andyzong',
-                            usernameVariable: 'GIT_USER',
-                            passwordVariable: 'GIT_PASS'
-                        )
+                        string(credentialsId: 'gitlab-pat-name', variable: 'PAT')
                     ]) {
                         bat """
                             :: check if the repository already exists
                             if not exist "${repoDir}\\.git" (
                                 echo Cloning repository...
-                                git clone https://%GIT_USER%:%GIT_PASS%@git.xxxx.com/VehicleDomainPlatform/d2_vdp.git ${repoDir}
+                                git clone https://oauth2:%PAT%@git.xxxxxx.com/VehicleDomainPlatform/yourproject.git ${repoDir}
                             ) else (
                                 echo Updating repository...
                                 cd ${repoDir}
                                 git reset --hard HEAD
                                 git clean -fdx
-                                git pull origin master
+                                ::git pull origin master --do not use
+                                git fetch origin master
+                                git reset --hard origin/master
                                 cd ..
                             )
                         """
@@ -35,7 +38,7 @@ pipeline {
         stage('Copy Build Scripts') {
             steps {
                 script {
-                    def repoDir = "VDP_" // same directory as above
+                    def repoDir = "yourproject" // same directory as above
                     bat """
                         :: copy Jenkins-specific scripts to target directory
                         xcopy /Y "${repoDir}\\z_build_s19\\launch_jenkins.bat" "${repoDir}\\project\\util\\"
@@ -51,7 +54,7 @@ pipeline {
         stage('GHS Build') {
             steps {
                 script {
-                    def repoDir = "VDP_"
+                    def repoDir = "yourproject"
                     bat """
                         cd "${repoDir}\\project\\util"
                         call launch_jenkins.bat
@@ -63,7 +66,7 @@ pipeline {
         stage('Execute Scripts') {
             steps {
                 script {
-                    def repoDir = "VDP_"
+                    def repoDir = "yourproject"
                     bat """
                         cd ${repoDir}\\z_build_s19
                         call copy_bin_to_here.bat
